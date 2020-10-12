@@ -45,7 +45,7 @@ pub fn raw_file_lock(f: &File, lock: Lock, off: usize, len: usize, wait: bool) -
 }
 
 pub fn raw_file_unlock(f: &File, off: usize, len: usize) -> io::Result<()> {
-    flck(f.as_raw_fd(), F_SETLK, F_UNLCK, off, len)
+    flck(f.as_raw_fd(), F_SETLK, F_UNLCK as c_short, off, len)
 }
 
 pub fn raw_file_lock_any(f: &File, off: usize, len: usize) -> io::Result<Lock> {
