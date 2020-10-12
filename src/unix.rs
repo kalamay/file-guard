@@ -34,8 +34,8 @@ fn flck(fd: c_int, op: c_int, typ: c_short, off: usize, len: usize) -> io::Resul
 
 pub fn raw_file_lock(f: &File, lock: Lock, off: usize, len: usize, wait: bool) -> io::Result<()> {
     let typ = match lock {
-        Lock::Shared => F_RDLCK,
-        Lock::Exclusive => F_WRLCK,
+        Lock::Shared => F_RDLCK as c_short,
+        Lock::Exclusive => F_WRLCK as c_short,
     };
     let op = match wait {
         true => F_SETLKW,
@@ -50,11 +50,11 @@ pub fn raw_file_unlock(f: &File, off: usize, len: usize) -> io::Result<()> {
 
 pub fn raw_file_lock_any(f: &File, off: usize, len: usize) -> io::Result<Lock> {
     let fd = f.as_raw_fd();
-    flck(fd, F_SETLK, F_WRLCK, off, len)
+    flck(fd, F_SETLK, F_WRLCK as c_short, off, len)
         .and(Ok(Lock::Exclusive))
         .or_else(|e| {
             if e.kind() == ErrorKind::WouldBlock {
-                flck(fd, F_SETLKW, F_RDLCK, off, len).and(Ok(Lock::Shared))
+                flck(fd, F_SETLKW, F_RDLCK as c_short, off, len).and(Ok(Lock::Shared))
             } else {
                 Err(e)
             }
