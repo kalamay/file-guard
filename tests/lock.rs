@@ -20,8 +20,7 @@ fn test_lock_any() -> io::Result<()> {
         .lock(Lock::Exclusive, 0, 1)
         .write(0, 1)
         .wait(0, 2)
-        .unlock()
-        .lock(Lock::Shared, 0, 1)
+        .upgrade(Lock::Shared)
         .write(0, 3)
         .wait(0, 4)
         .unlock()
@@ -29,7 +28,7 @@ fn test_lock_any() -> io::Result<()> {
 
     let mut b = pipeline::Pipeline::new(&path)
         .wait(0, 1)
-        .try_lock(Lock::Shared, 0, 1, false)
+        .try_lock(Err(Lock::Shared), 0, 1)
         .write(0, 2)
         .wait(0, 3)
         .lock(Lock::Shared, 0, 1)

@@ -31,18 +31,18 @@ fn run(args: &mut env::Args, map: &mut MapMut, file: &File) {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "+lock" => {
-                let (lock, off, len) = lock_type(args, map.len());
+                let (lock, off, len) = lock_values(args, map.len());
                 if let Some(_) = guard {
                     error!("lock is already held");
                 } else {
                     let g = file_guard::lock(file, lock, off, len)
                         .unwrap_or_else(|e| error!("{:?} lock failed: {}", lock, e));
-                    println!("{} {:?}", arg, g);
+                    println!("{} {:?}", arg, lock);
                     guard = Some(g);
                 }
             }
             "+trylock" => {
-                let (lock, off, len) = lock_type(args, map.len());
+                let (lock, off, len) = lock_values(args, map.len());
                 if let Some(_) = guard {
                     error!("lock is already held");
                 } else {
@@ -55,7 +55,7 @@ fn run(args: &mut env::Args, map: &mut MapMut, file: &File) {
                             }
                         }
                         Ok(g) => {
-                            println!("{} {:?}", arg, g);
+                            println!("{} {:?}", arg, lock);
                             guard = Some(g);
                         }
                     }
@@ -68,8 +68,39 @@ fn run(args: &mut env::Args, map: &mut MapMut, file: &File) {
                 } else {
                     let g = file_guard::lock_any(file, off, len)
                         .unwrap_or_else(|e| error!("any lock failed: {}", e));
-                    println!("{} {:?}", arg, g);
+                    println!("{} {:?}", arg, g.lock_type());
                     guard = Some(g);
+                }
+            }
+            "+upgrade" => {
+                if let Some(ref mut g) = guard {
+                    let lock = lock_type(args);
+                    g.upgrade(lock)
+                        .unwrap_or_else(|e| error!("{:?} upgrade failed: {}", lock, e));
+                    println!("{} {:?}", arg, lock);
+                } else {
+                    error!("lock is not held");
+                }
+            }
+            "+tryupgrade" => {
+                if let Some(ref mut g) = guard {
+                    let lock = lock_type(args);
+                    g.try_upgrade(lock)
+                        .unwrap_or_else(|e| error!("any lock failed: {}", e));
+                    match g.try_upgrade(lock) {
+                        Err(e) => {
+                            if e.kind() == ErrorKind::WouldBlock {
+                                println!("{} None", arg)
+                            } else {
+                                error!("{:?} try upgrade failed: {}", lock, e)
+                            }
+                        }
+                        Ok(_) => {
+                            println!("{} {:?}", arg, g.lock_type());
+                        }
+                    }
+                } else {
+                    error!("lock is not held");
                 }
             }
             "+unlock" => {
@@ -125,17 +156,17 @@ fn int(args: &mut env::Args, min: usize, max: usize) -> usize {
     s
 }
 
-fn lock_type(args: &mut env::Args, len: usize) -> (Lock, usize, usize) {
+fn lock_values(args: &mut env::Args, len: usize) -> (Lock, usize, usize) {
     let (off, len) = lock_size(args, len);
-    (
-        match next(args, "lock type").as_str() {
-            "sh" | "shared" => Lock::Shared,
-            "ex" | "exclusive" => Lock::Exclusive,
-            other => error!("unknown lock type {}", other),
-        },
-        off,
-        len,
-    )
+    (lock_type(args), off, len)
+}
+
+fn lock_type(args: &mut env::Args) -> Lock {
+    match next(args, "lock type").as_str() {
+        "sh" | "shared" => Lock::Shared,
+        "ex" | "exclusive" => Lock::Exclusive,
+        other => error!("unknown lock type {}", other),
+    }
 }
 
 fn lock_size(args: &mut env::Args, len: usize) -> (usize, usize) {

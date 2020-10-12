@@ -18,8 +18,7 @@ fn test_lock_any() -> io::Result<()> {
 
     let mut a = pipeline::Pipeline::new(&path)
         .lock_any(Lock::Exclusive, 0, 1)
-        .unlock()
-        .lock(Lock::Shared, 0, 1)
+        .upgrade(Lock::Shared)
         .write(0, 1)
         .wait(0, 2)
         .unlock()

@@ -10,6 +10,8 @@ pub fn interleave(a: &mut PipelineSpawn, b: &mut PipelineSpawn) -> io::Result<()
     Ok(())
 }
 
+pub type Try = std::result::Result<Lock, Lock>;
+
 pub struct Pipeline {
     cargo: String,
     dir: String,
@@ -64,19 +66,29 @@ impl Pipeline {
 
     #[allow(dead_code)]
     pub fn lock(&mut self, lock: Lock, off: usize, len: usize) -> &mut Self {
-        self.add_lock("lock", lock, off, len, true)
+        self.add_lock("lock", Ok(lock), off, len)
     }
 
     #[allow(dead_code)]
-    pub fn try_lock(&mut self, lock: Lock, off: usize, len: usize, expect: bool) -> &mut Self {
-        self.add_lock("trylock", lock, off, len, expect)
+    pub fn try_lock(&mut self, lock: Try, off: usize, len: usize) -> &mut Self {
+        self.add_lock("trylock", lock, off, len)
     }
 
     #[allow(dead_code)]
     pub fn lock_any(&mut self, expect: Lock, off: usize, len: usize) -> &mut Self {
-        self.add_lock_result("lockany", expect, off, len);
+        self.add_lock_result("lockany", Ok(expect));
         self.add_arg_size2("lockany", off, len);
         self
+    }
+
+    #[allow(dead_code)]
+    pub fn upgrade(&mut self, lock: Lock) -> &mut Self {
+        self.add_upgrade("upgrade", Ok(lock))
+    }
+
+    #[allow(dead_code)]
+    pub fn try_upgrade(&mut self, lock: Try) -> &mut Self {
+        self.add_upgrade("tryupgrade", lock)
     }
 
     #[allow(dead_code)]
@@ -96,30 +108,24 @@ impl Pipeline {
         self.add_size2("wait", off, val)
     }
 
-    fn add_lock(
-        &mut self,
-        arg: &'static str,
-        lock: Lock,
-        off: usize,
-        len: usize,
-        expect: bool,
-    ) -> &mut Self {
-        if expect {
-            self.add_lock_result(arg, lock, off, len);
+    fn add_lock(&mut self, arg: &'static str, lock: Try, off: usize, len: usize) -> &mut Self {
+        self.add_lock_result(arg, lock);
+        self.add_arg_size2(arg, off, len);
+        self.add_arg_type(lock)
+    }
+
+    fn add_upgrade(&mut self, arg: &'static str, lock: Try) -> &mut Self {
+        self.add_lock_result(arg, lock);
+        self.args.push(format!("+{}", arg));
+        self.add_arg_type(lock)
+    }
+
+    fn add_lock_result(&mut self, arg: &'static str, lock: Try) {
+        if let Ok(lock) = lock {
+            self.lines.push(format!("+{} {:?}", arg, lock));
         } else {
             self.lines.push(format!("+{} None", arg));
         }
-        self.add_arg_size2(arg, off, len);
-        self.args.push(match lock {
-            Lock::Shared => "sh".to_owned(),
-            Lock::Exclusive => "ex".to_owned(),
-        });
-        self
-    }
-
-    fn add_lock_result(&mut self, arg: &'static str, lock: Lock, off: usize, len: usize) {
-        self.lines
-            .push(format!("+{} FileGuard::{:?}({}, {})", arg, lock, off, len));
     }
 
     fn add_size2(&mut self, arg: &'static str, a: usize, b: usize) -> &mut Self {
@@ -132,6 +138,14 @@ impl Pipeline {
         self.args.push(format!("+{}", arg));
         self.args.push(format!("{}", a));
         self.args.push(format!("{}", b));
+    }
+
+    fn add_arg_type(&mut self, lock: Try) -> &mut Self {
+        self.args.push(match lock.unwrap_or_else(|e| e) {
+            Lock::Shared => "sh".to_owned(),
+            Lock::Exclusive => "ex".to_owned(),
+        });
+        self
     }
 }
 
