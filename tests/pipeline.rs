@@ -152,6 +152,8 @@ impl PipelineSpawn {
 
 impl Drop for PipelineSpawn {
     fn drop(&mut self) {
-        self.child.kill().unwrap();
+        match self.child.kill() {
+            _ => {}
+        }
     }
 }
