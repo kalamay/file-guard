@@ -4,5 +4,5 @@
 Cargo.lock
 *~
 *.swp
-example-*
-test-*
+/example-*
+/test-*
