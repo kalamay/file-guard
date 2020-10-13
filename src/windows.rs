@@ -10,14 +10,6 @@ use winapi::um::minwinbase::{LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
 
 use super::Lock;
 
-fn overlapped(off: usize) -> OVERLAPPED {
-    let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut s = unsafe { ov.u.s_mut() };
-    s.Offset = (off & 0xffffffff) as DWORD;
-    s.OffsetHigh = (off >> 32) as DWORD;
-    ov
-}
-
 pub fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
@@ -29,33 +21,22 @@ pub fn raw_file_lock(
         return Err(ErrorKind::InvalidInput.into());
     }
 
-    let mut ov = overlapped(off);
+    let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut s = unsafe { ov.u.s_mut() };
+    s.Offset = (off & 0xffffffff) as DWORD;
+    s.OffsetHigh = (off >> 32) as DWORD;
+
+    let lenlow = (len & 0xffffffff) as DWORD;
+    let lenhigh = (len >> 32) as DWORD;
 
     let rc = if let Some(lock) = lock {
         let mut flags = if wait { 0 } else { LOCKFILE_FAIL_IMMEDIATELY };
         if lock == Lock::Exclusive {
             flags = flags | LOCKFILE_EXCLUSIVE_LOCK;
         }
-        unsafe {
-            LockFileEx(
-                f.as_raw_handle(),
-                flags,
-                0,
-                (len & 0xffffffff) as DWORD,
-                (len >> 32) as DWORD,
-                &mut ov,
-            )
-        }
+        unsafe { LockFileEx(f.as_raw_handle(), flags, 0, lenlow, lenhigh, &mut ov) }
     } else {
-        unsafe {
-            UnlockFileEx(
-                f.as_raw_handle(),
-                0,
-                (len & 0xffffffff) as DWORD,
-                (len >> 32) as DWORD,
-                &mut ov,
-            )
-        }
+        unsafe { UnlockFileEx(f.as_raw_handle(), 0, lenlow, lenhigh, &mut ov) }
     };
 
     if rc == 0 {
