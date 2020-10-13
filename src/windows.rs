@@ -24,10 +24,10 @@ pub fn raw_file_lock(
     let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
     let mut s = unsafe { ov.u.s_mut() };
     s.Offset = (off & 0xffffffff) as DWORD;
-    s.OffsetHigh = (off >> 32) as DWORD;
+    s.OffsetHigh = (off >> 16 >> 16) as DWORD;
 
     let lenlow = (len & 0xffffffff) as DWORD;
-    let lenhigh = (len >> 32) as DWORD;
+    let lenhigh = (len >> 16 >> 16) as DWORD;
 
     let rc = if let Some(lock) = lock {
         let mut flags = if wait { 0 } else { LOCKFILE_FAIL_IMMEDIATELY };
