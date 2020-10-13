@@ -105,20 +105,8 @@ use std::io::ErrorKind;
 use std::ops::{Deref, Range};
 use std::{fmt, io};
 
-cfg_if::cfg_if! {
-    if #[cfg(windows)] {
-        mod windows;
-        use self::windows::{raw_file_lock, raw_file_downgrade};
-        pub use self::unix::FileGuardExt;
-    } else if #[cfg(unix)] {
-        #[macro_use]
-        mod unix;
-        use self::unix::{raw_file_lock, raw_file_downgrade};
-        pub use self::unix::FileGuardExt;
-    } else {
-        // Unknown target_family
-    }
-}
+pub mod os;
+use self::os::{raw_file_downgrade, raw_file_lock};
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Lock {

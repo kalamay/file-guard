@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{self, Error, ErrorKind};
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::os::windows::io::AsRawHandle;
 
 use winapi::shared::minwindef::DWORD;
@@ -8,9 +9,9 @@ use winapi::shared::winerror::ERROR_LOCK_VIOLATION;
 use winapi::um::fileapi::{LockFileEx, UnlockFileEx};
 use winapi::um::minwinbase::{LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY, OVERLAPPED};
 
-use super::Lock;
+use crate::{FileGuard, Lock};
 
-pub fn raw_file_lock(
+pub(crate) fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
     off: usize,
@@ -51,7 +52,7 @@ pub fn raw_file_lock(
     }
 }
 
-pub fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
+pub(crate) fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     // Add a shared lock.
     raw_file_lock(f, Some(Lock::Shared), off, len, false)?;
     // Removed the exclusive lock.

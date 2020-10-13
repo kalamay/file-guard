@@ -6,9 +6,9 @@ use std::ops::Deref;
 use std::os::raw::c_short;
 use std::os::unix::io::AsRawFd;
 
-use super::{FileGuard, Lock};
+use crate::{FileGuard, Lock};
 
-pub fn raw_file_lock(
+pub(crate) fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
     off: usize,
@@ -49,7 +49,7 @@ pub fn raw_file_lock(
     }
 }
 
-pub fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
+pub(crate) fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     raw_file_lock(f, Some(Lock::Shared), off, len, false)
 }
 
