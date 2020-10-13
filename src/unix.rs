@@ -16,33 +16,35 @@ pub fn raw_file_lock(
     wait: bool,
 ) -> io::Result<()> {
     if len == 0 {
-        Err(ErrorKind::InvalidInput.into())
-    } else {
-        let op = match wait {
-            true => F_SETLKW,
-            false => F_SETLK,
-        };
-        let lock = libc::flock {
-            l_start: off as off_t,
-            l_len: len as off_t,
-            l_pid: 0,
-            l_type: match lock {
-                Some(Lock::Shared) => F_RDLCK as c_short,
-                Some(Lock::Exclusive) => F_WRLCK as c_short,
-                None => F_UNLCK as c_short,
-            },
-            l_whence: SEEK_SET as c_short,
-        };
-        loop {
-            let rc = unsafe { fcntl(f.as_raw_fd(), op, &lock) };
-            if rc == -1 {
-                let err = Error::last_os_error();
-                if err.kind() != ErrorKind::Interrupted {
-                    break Err(err);
-                }
-            } else {
-                break Ok(());
+        return Err(ErrorKind::InvalidInput.into());
+    }
+
+    let op = match wait {
+        true => F_SETLKW,
+        false => F_SETLK,
+    };
+
+    let lock = libc::flock {
+        l_start: off as off_t,
+        l_len: len as off_t,
+        l_pid: 0,
+        l_type: match lock {
+            Some(Lock::Shared) => F_RDLCK as c_short,
+            Some(Lock::Exclusive) => F_WRLCK as c_short,
+            None => F_UNLCK as c_short,
+        },
+        l_whence: SEEK_SET as c_short,
+    };
+
+    loop {
+        let rc = unsafe { fcntl(f.as_raw_fd(), op, &lock) };
+        if rc == -1 {
+            let err = Error::last_os_error();
+            if err.kind() != ErrorKind::Interrupted {
+                break Err(err);
             }
+        } else {
+            break Ok(());
         }
     }
 }
