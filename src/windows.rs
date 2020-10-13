@@ -57,3 +57,7 @@ pub fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     // Removed the exclusive lock.
     raw_file_lock(f, None, off, len, false)
 }
+
+pub trait FileGuardExt {}
+
+impl<T> FileGuardExt for FileGuard<T> where T: Deref<Target = File> {}

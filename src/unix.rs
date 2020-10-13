@@ -53,12 +53,12 @@ pub fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     raw_file_lock(f, Some(Lock::Shared), off, len, false)
 }
 
-pub trait Upgrade {
+pub trait FileGuardExt {
     fn upgrade(&mut self) -> io::Result<()>;
     fn try_upgrade(&mut self) -> io::Result<()>;
 }
 
-impl<T> Upgrade for FileGuard<T>
+impl<T> FileGuardExt for FileGuard<T>
 where
     T: Deref<Target = File>,
 {
