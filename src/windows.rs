@@ -11,24 +11,51 @@ use winapi::um::minwinbase::{LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
 
 use super::Lock;
 
-fn flock(file: HANDLE, flags: DWORD, off: usize, len: usize) -> io::Result<()> {
+fn overlapped(off: usize) -> OVERLAPPED {
+    let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
+    let mut s = unsafe { ov.u.s_mut() };
+    s.Offset = (off & 0xffffffff) as DWORD;
+    s.OffsetHigh = (off >> 32) as DWORD;
+    ov
+}
+
+pub fn raw_file_lock(
+    f: &File,
+    lock: Option<Lock>,
+    off: usize,
+    len: usize,
+    wait: bool,
+) -> io::Result<()> {
     if len == 0 {
         Err(ErrorKind::InvalidInput.into())
     } else {
-        let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
-        let mut s = unsafe { ov.u.s_mut() };
-        s.Offset = (off & 0xffffffff) as DWORD;
-        s.OffsetHigh = (off >> 32) as DWORD;
+        let mut ov = overlapped(off);
 
-        let rc = unsafe {
-            LockFileEx(
-                file,
-                flags,
-                0,
-                (len & 0xffffffff) as DWORD,
-                (len >> 32) as DWORD,
-                &mut ov,
-            )
+        let rc = if let Some(lock) = lock {
+            let mut flags = if wait { 0 } else { LOCKFILE_FAIL_IMMEDIATELY };
+            if lock == Lock::Exclusive {
+                flags = flags | LOCKFILE_EXCLUSIVE_LOCK;
+            }
+            unsafe {
+                LockFileEx(
+                    f.as_raw_handle(),
+                    flags,
+                    0,
+                    (len & 0xffffffff) as DWORD,
+                    (len >> 32) as DWORD,
+                    &mut ov,
+                )
+            }
+        } else {
+            unsafe {
+                UnlockFileEx(
+                    f.as_raw_handle(),
+                    0,
+                    (len & 0xffffffff) as DWORD,
+                    (len >> 32) as DWORD,
+                    &mut ov,
+                )
+            }
         };
 
         if rc == 0 {
@@ -44,55 +71,9 @@ fn flock(file: HANDLE, flags: DWORD, off: usize, len: usize) -> io::Result<()> {
     }
 }
 
-pub fn raw_file_lock(f: &File, lock: Lock, off: usize, len: usize, wait: bool) -> io::Result<()> {
-    let mut flags = if wait { 0 } else { LOCKFILE_FAIL_IMMEDIATELY };
-    if lock == Lock::Exclusive {
-        flags = flags | LOCKFILE_EXCLUSIVE_LOCK;
-    }
-    flock(f.as_raw_handle(), flags, off, len)
-}
-
-pub fn raw_file_unlock(f: &File, off: usize, len: usize) -> io::Result<()> {
-    if len == 0 {
-        Err(ErrorKind::InvalidInput.into())
-    } else {
-        let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
-        let mut s = unsafe { ov.u.s_mut() };
-        s.Offset = (off & 0xffffffff) as DWORD;
-        s.OffsetHigh = (off >> 32) as DWORD;
-
-        let rc = unsafe {
-            UnlockFileEx(
-                f.as_raw_handle(),
-                0,
-                (len & 0xffffffff) as DWORD,
-                (len >> 32) as DWORD,
-                &mut ov,
-            )
-        };
-
-        if rc == 0 {
-            Err(Error::last_os_error())
-        } else {
-            Ok(())
-        }
-    }
-}
-
-pub fn raw_file_lock_any(f: &File, off: usize, len: usize) -> io::Result<Lock> {
-    let fd = f.as_raw_handle();
-    flock(
-        fd,
-        LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-        off,
-        len,
-    )
-    .and(Ok(Lock::Exclusive))
-    .or_else(|e| {
-        if e.kind() == ErrorKind::WouldBlock {
-            flock(fd, 0, off, len).and(Ok(Lock::Shared))
-        } else {
-            Err(e)
-        }
-    })
+pub fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
+    // Add a shared lock.
+    raw_file_lock(f, Some(Lock::Shared), off, len, false)?;
+    // Removed the exclusive lock.
+    raw_file_lock(f, None, off, len, false)?;
 }

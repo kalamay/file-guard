@@ -82,13 +82,10 @@ impl Pipeline {
     }
 
     #[allow(dead_code)]
-    pub fn upgrade(&mut self, lock: Lock) -> &mut Self {
-        self.add_upgrade("upgrade", Ok(lock))
-    }
-
-    #[allow(dead_code)]
-    pub fn try_upgrade(&mut self, lock: Try) -> &mut Self {
-        self.add_upgrade("tryupgrade", lock)
+    pub fn downgrade(&mut self) -> &mut Self {
+        self.add_lock_result("downgrade", Ok(Lock::Shared));
+        self.args.push(format!("+downgrade"));
+        self
     }
 
     #[allow(dead_code)]
@@ -111,12 +108,6 @@ impl Pipeline {
     fn add_lock(&mut self, arg: &'static str, lock: Try, off: usize, len: usize) -> &mut Self {
         self.add_lock_result(arg, lock);
         self.add_arg_size2(arg, off, len);
-        self.add_arg_type(lock)
-    }
-
-    fn add_upgrade(&mut self, arg: &'static str, lock: Try) -> &mut Self {
-        self.add_lock_result(arg, lock);
-        self.args.push(format!("+{}", arg));
         self.add_arg_type(lock)
     }
 

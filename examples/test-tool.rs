@@ -72,33 +72,11 @@ fn run(args: &mut env::Args, map: &mut MapMut, file: &File) {
                     guard = Some(g);
                 }
             }
-            "+upgrade" => {
+            "+downgrade" => {
                 if let Some(ref mut g) = guard {
-                    let lock = lock_type(args);
-                    g.upgrade(lock)
-                        .unwrap_or_else(|e| error!("{:?} upgrade failed: {}", lock, e));
-                    println!("{} {:?}", arg, lock);
-                } else {
-                    error!("lock is not held");
-                }
-            }
-            "+tryupgrade" => {
-                if let Some(ref mut g) = guard {
-                    let lock = lock_type(args);
-                    g.try_upgrade(lock)
-                        .unwrap_or_else(|e| error!("any lock failed: {}", e));
-                    match g.try_upgrade(lock) {
-                        Err(e) => {
-                            if e.kind() == ErrorKind::WouldBlock {
-                                println!("{} None", arg)
-                            } else {
-                                error!("{:?} try upgrade failed: {}", lock, e)
-                            }
-                        }
-                        Ok(_) => {
-                            println!("{} {:?}", arg, g.lock_type());
-                        }
-                    }
+                    g.downgrade()
+                        .unwrap_or_else(|e| error!("downgrade failed: {}", e));
+                    println!("{} {:?}", arg, Lock::Shared);
                 } else {
                     error!("lock is not held");
                 }

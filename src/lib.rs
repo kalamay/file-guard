@@ -1,3 +1,20 @@
+//! A cross-platform library for safe advisory file locking.
+//!
+//! The lock supports both exclusive and shared locking modes for a byte range
+//! of an opened `File` object. Exclusively locking a portion of a file denies
+//! all other processes both shared and exclusive access to the specified
+//! region of the file. Shared locking a portion of a file denies all processes
+//! exclusive access to the specified region of the file. The locked range does
+//! not need to exist within the file, and the ranges may be used for any
+//! arbitrary advisory locking protocol between processes.
+//!
+//! This result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
+//! [`FileGuard`]. When dropped, this [`FileGuard`] will unlock the region of
+//! the file currently held. This value may also be [`.upgrade()`]'ed to
+//! either a shared or exlusive lock.
+//!
+//! On Unix systems `fcntl` is used to perform the locking, and on Windows, `LockFileEx`.
+//!
 //! # Examples
 //!
 //! ```
@@ -44,8 +61,8 @@
 //! # }
 //! ```
 //!
-//! Anything that can `Deref` to a file can be used with the [`FileGuard`].
-//! This works with `Rc<File>`:
+//! Anything that can `Deref` to a `File` can be used with the [`FileGuard`]
+//! (i.e. `Rc<File>`):
 //!
 //! ```
 //! use file_guard::{FileGuard, Lock};
@@ -74,21 +91,29 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! [`FileGuard`]: struct.FileGuard.html
+//! [`lock()`]: fn.lock.html
+//! [`try_lock()`]: fn.try_lock.html
+//! [`lock_any()`]: fn.lock_any.html
+//! [`.upgrade()`]: struct.FileGuard.html#method.upgrade
 
-//#![warn(missing_docs)]
+//#![deny(missing_docs)]
 
 use std::fs::File;
+use std::io::ErrorKind;
 use std::ops::{Deref, Range};
 use std::{fmt, io};
 
 cfg_if::cfg_if! {
     if #[cfg(windows)] {
         mod windows;
-        pub use self::windows::{raw_file_lock, raw_file_unlock, raw_file_lock_any};
+        use self::windows::{raw_file_lock, raw_file_downgrade};
     } else if #[cfg(unix)] {
         #[macro_use]
         mod unix;
-        pub use self::unix::{raw_file_lock, raw_file_unlock, raw_file_lock_any};
+        use self::unix::{raw_file_lock, raw_file_downgrade};
+        pub use self::unix::Upgrade;
     } else {
         // Unknown target_family
     }
@@ -106,7 +131,7 @@ pub fn lock<T: Deref<Target = File>>(
     offset: usize,
     len: usize,
 ) -> io::Result<FileGuard<T>> {
-    raw_file_lock(&file, lock, offset, len, true)?;
+    raw_file_lock(&file, Some(lock), offset, len, true)?;
     Ok(FileGuard {
         offset,
         len,
@@ -121,7 +146,7 @@ pub fn try_lock<T: Deref<Target = File>>(
     offset: usize,
     len: usize,
 ) -> io::Result<FileGuard<T>> {
-    raw_file_lock(&file, lock, offset, len, false)?;
+    raw_file_lock(&file, Some(lock), offset, len, false)?;
     Ok(FileGuard {
         offset,
         len,
@@ -135,7 +160,17 @@ pub fn lock_any<T: Deref<Target = File>>(
     offset: usize,
     len: usize,
 ) -> io::Result<FileGuard<T>> {
-    let lock = raw_file_lock_any(&file, offset, len)?;
+    let lock = match raw_file_lock(&file, Some(Lock::Exclusive), offset, len, false) {
+        Ok(_) => Lock::Exclusive,
+        Err(e) => {
+            if e.kind() == ErrorKind::WouldBlock {
+                raw_file_lock(&file, Some(Lock::Shared), offset, len, true)?;
+                Lock::Shared
+            } else {
+                return Err(e);
+            }
+        }
+    };
     Ok(FileGuard {
         offset,
         len,
@@ -204,20 +239,10 @@ where
         self.len == 0
     }
 
-    #[inline]
-    pub fn upgrade(&mut self, lock: Lock) -> io::Result<()> {
-        if self.lock != lock {
-            raw_file_lock(&self.file, lock, self.offset, self.len, true)?;
-            self.lock = lock;
-        }
-        Ok(())
-    }
-
-    #[inline]
-    pub fn try_upgrade(&mut self, lock: Lock) -> io::Result<()> {
-        if self.lock != lock {
-            raw_file_lock(&self.file, lock, self.offset, self.len, false)?;
-            self.lock = lock;
+    pub fn downgrade(&mut self) -> io::Result<()> {
+        if self.is_exclusive() {
+            raw_file_downgrade(&self.file, self.offset, self.len)?;
+            self.lock = Lock::Shared;
         }
         Ok(())
     }
@@ -240,6 +265,6 @@ where
 {
     #[inline]
     fn drop(&mut self) {
-        let _ = raw_file_unlock(&self.file, self.offset, self.len);
+        let _ = raw_file_lock(&self.file, None, self.offset, self.len, false);
     }
 }

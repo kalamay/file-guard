@@ -20,7 +20,7 @@ fn test_try_lock() -> io::Result<()> {
         .try_lock(Ok(Lock::Exclusive), 0, 1)
         .write(0, 1)
         .wait(0, 2)
-        .try_upgrade(Ok(Lock::Shared))
+        .downgrade()
         .write(0, 3)
         .wait(0, 4)
         .unlock()

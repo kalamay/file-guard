@@ -1,3 +1,26 @@
+![Verify](https://github.com/kalamay/file-guard/workflows/Verify/badge.svg?branch=main)
+
+# file-guard
+
+A cross-platform library for safe file locking in Rust.
+
+Take a look at the [Documentation](https://docs.rs/file-guard/) for details!
+
+The lock supports both exclusive and shared locking modes for a byte range
+of an opened `File` object. Exclusively locking a portion of a file denies
+all other processes both shared and exclusive access to the specified
+region of the file. Shared locking a portion of a file denies all processes
+exclusive access to the specified region of the file. The locked range does
+not need to exist within the file, and the ranges may be used for any
+arbitrary advisory locking protocol between processes.
+
+This result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
+[`FileGuard`]. When dropped, this [`FileGuard`] will unlock the region of
+the file currently held. This value may also be [`.upgrade()`]'ed to
+either a shared or exlusive lock.
+
+On Unix systems `fcntl` is used to perform the locking, and on Windows, `LockFileEx`.
+
 # Examples
 
 ```rust
@@ -38,7 +61,7 @@ let t = Thing {
 // both locks will be unlocked when t goes out of scope
 ```
 
-Anything that can `Deref` to a file can be used with the [`FileGuard`].
+Anything that can `Deref` to a `File` can be used with the [`FileGuard`].
 This works with `Rc<File>`:
 
 ```rust
@@ -65,3 +88,9 @@ let t = Thing {
 };
 // both locks will be unlocked and the file will be closed when t goes out of scope
 ```
+
+[`FileGuard`]: https://docs.rs/file-guard/0.1.0/file_guard/struct.FileGuard.html
+[`lock()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.lock.html
+[`try_lock()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.try_lock.html
+[`lock_any()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.lock_any.html
+[`.upgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/struct.FileGuard.html#method.upgrade
