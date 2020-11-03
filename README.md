@@ -14,10 +14,11 @@ exclusive access to the specified region of the file. The locked range does
 not need to exist within the file, and the ranges may be used for any
 arbitrary advisory locking protocol between processes.
 
-This result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
+The result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
 [`FileGuard`]. When dropped, this [`FileGuard`] will unlock the region of
-the file currently held. This value may also be [`.upgrade()`]'ed to
-either a shared or exlusive lock.
+the file currently held. Exclusive locks may be [`.downgrade()`]'ed to
+either a shared lock cross platform. On UNIX systems, a shared lock may
+be [`.upgrade()`]'ed to an exclusive lock.
 
 On Unix systems `fcntl` is used to perform the locking, and on Windows, `LockFileEx`.
 
@@ -93,4 +94,5 @@ let t = Thing {
 [`lock()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.lock.html
 [`try_lock()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.try_lock.html
 [`lock_any()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.lock_any.html
-[`.upgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/struct.FileGuard.html#method.upgrade
+[`.downgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/struct.FileGuard.html#method.downgrade
+[`.upgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/os/unix/trait.FileGuardExt.html#tymethod.upgrade

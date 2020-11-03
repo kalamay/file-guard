@@ -8,10 +8,11 @@
 //! not need to exist within the file, and the ranges may be used for any
 //! arbitrary advisory locking protocol between processes.
 //!
-//! This result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
+//! The result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
 //! [`FileGuard`]. When dropped, this [`FileGuard`] will unlock the region of
-//! the file currently held. This value may also be [`.upgrade()`]'ed to
-//! either a shared or exlusive lock.
+//! the file currently held. Exclusive locks may be [`.downgrade()`]'ed to
+//! either a shared lock cross platform. On UNIX systems, a shared lock may
+//! be [`.upgrade()`]'ed to an exclusive lock.
 //!
 //! On Unix systems `fcntl` is used to perform the locking, and on Windows, `LockFileEx`.
 //!
@@ -96,7 +97,8 @@
 //! [`lock()`]: fn.lock.html
 //! [`try_lock()`]: fn.try_lock.html
 //! [`lock_any()`]: fn.lock_any.html
-//! [`.upgrade()`]: struct.FileGuard.html#method.upgrade
+//! [`.downgrade()`]: struct.FileGuard.html#method.downgrade
+//! [`.upgrade()`]: os/unix/trait.FileGuardExt.html#tymethod.upgrade
 
 //#![deny(missing_docs)]
 
