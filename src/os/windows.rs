@@ -11,7 +11,7 @@ use winapi::um::minwinbase::{LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
 
 use crate::{FileGuard, Lock};
 
-pub(crate) fn raw_file_lock(
+pub unsafe fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
     off: usize,
@@ -22,8 +22,8 @@ pub(crate) fn raw_file_lock(
         return Err(ErrorKind::InvalidInput.into());
     }
 
-    let mut ov: OVERLAPPED = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut s = unsafe { ov.u.s_mut() };
+    let mut ov: OVERLAPPED = MaybeUninit::zeroed().assume_init();
+    let mut s = ov.u.s_mut();
     s.Offset = (off & 0xffffffff) as DWORD;
     s.OffsetHigh = (off >> 16 >> 16) as DWORD;
 
@@ -33,11 +33,11 @@ pub(crate) fn raw_file_lock(
     let rc = if let Some(lock) = lock {
         let mut flags = if wait { 0 } else { LOCKFILE_FAIL_IMMEDIATELY };
         if lock == Lock::Exclusive {
-            flags = flags | LOCKFILE_EXCLUSIVE_LOCK;
+            flags |= LOCKFILE_EXCLUSIVE_LOCK;
         }
-        unsafe { LockFileEx(f.as_raw_handle(), flags, 0, lenlow, lenhigh, &mut ov) }
+        LockFileEx(f.as_raw_handle(), flags, 0, lenlow, lenhigh, &mut ov)
     } else {
-        unsafe { UnlockFileEx(f.as_raw_handle(), 0, lenlow, lenhigh, &mut ov) }
+        UnlockFileEx(f.as_raw_handle(), 0, lenlow, lenhigh, &mut ov)
     };
 
     if rc == 0 {
@@ -52,7 +52,7 @@ pub(crate) fn raw_file_lock(
     }
 }
 
-pub(crate) fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
+pub unsafe fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     // Add a shared lock.
     raw_file_lock(f, Some(Lock::Shared), off, len, false)?;
     // Removed the exclusive lock.

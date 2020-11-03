@@ -8,7 +8,7 @@ use std::os::unix::io::AsRawFd;
 
 use crate::{FileGuard, Lock};
 
-pub(crate) fn raw_file_lock(
+pub unsafe fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
     off: usize,
@@ -37,7 +37,7 @@ pub(crate) fn raw_file_lock(
     };
 
     loop {
-        let rc = unsafe { fcntl(f.as_raw_fd(), op, &lock) };
+        let rc = fcntl(f.as_raw_fd(), op, &lock);
         if rc == -1 {
             let err = Error::last_os_error();
             if err.kind() != ErrorKind::Interrupted {
@@ -49,7 +49,7 @@ pub(crate) fn raw_file_lock(
     }
 }
 
-pub(crate) fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
+pub unsafe fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     raw_file_lock(f, Some(Lock::Shared), off, len, false)
 }
 
@@ -64,13 +64,15 @@ where
 {
     fn upgrade(&mut self) -> io::Result<()> {
         if self.is_shared() {
-            raw_file_lock(
-                &self.file,
-                Some(Lock::Exclusive),
-                self.offset,
-                self.len,
-                true,
-            )?;
+            unsafe {
+                raw_file_lock(
+                    &self.file,
+                    Some(Lock::Exclusive),
+                    self.offset,
+                    self.len,
+                    true,
+                )?;
+            }
             self.lock = Lock::Exclusive;
         }
         Ok(())
@@ -78,13 +80,15 @@ where
 
     fn try_upgrade(&mut self) -> io::Result<()> {
         if self.is_shared() {
-            raw_file_lock(
-                &self.file,
-                Some(Lock::Exclusive),
-                self.offset,
-                self.len,
-                false,
-            )?;
+            unsafe {
+                raw_file_lock(
+                    &self.file,
+                    Some(Lock::Exclusive),
+                    self.offset,
+                    self.len,
+                    false,
+                )?;
+            }
             self.lock = Lock::Exclusive;
         }
         Ok(())

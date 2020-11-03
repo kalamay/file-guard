@@ -122,7 +122,9 @@ pub fn lock<T: Deref<Target = File>>(
     offset: usize,
     len: usize,
 ) -> io::Result<FileGuard<T>> {
-    raw_file_lock(&file, Some(lock), offset, len, true)?;
+    unsafe {
+        raw_file_lock(&file, Some(lock), offset, len, true)?;
+    }
     Ok(FileGuard {
         offset,
         len,
@@ -137,7 +139,9 @@ pub fn try_lock<T: Deref<Target = File>>(
     offset: usize,
     len: usize,
 ) -> io::Result<FileGuard<T>> {
-    raw_file_lock(&file, Some(lock), offset, len, false)?;
+    unsafe {
+        raw_file_lock(&file, Some(lock), offset, len, false)?;
+    }
     Ok(FileGuard {
         offset,
         len,
@@ -151,11 +155,13 @@ pub fn lock_any<T: Deref<Target = File>>(
     offset: usize,
     len: usize,
 ) -> io::Result<FileGuard<T>> {
-    let lock = match raw_file_lock(&file, Some(Lock::Exclusive), offset, len, false) {
+    let lock = match unsafe { raw_file_lock(&file, Some(Lock::Exclusive), offset, len, false) } {
         Ok(_) => Lock::Exclusive,
         Err(e) => {
             if e.kind() == ErrorKind::WouldBlock {
-                raw_file_lock(&file, Some(Lock::Shared), offset, len, true)?;
+                unsafe {
+                    raw_file_lock(&file, Some(Lock::Shared), offset, len, true)?;
+                }
                 Lock::Shared
             } else {
                 return Err(e);
@@ -232,7 +238,9 @@ where
 
     pub fn downgrade(&mut self) -> io::Result<()> {
         if self.is_exclusive() {
-            raw_file_downgrade(&self.file, self.offset, self.len)?;
+            unsafe {
+                raw_file_downgrade(&self.file, self.offset, self.len)?;
+            }
             self.lock = Lock::Shared;
         }
         Ok(())
@@ -256,6 +264,6 @@ where
 {
     #[inline]
     fn drop(&mut self) {
-        let _ = raw_file_lock(&self.file, None, self.offset, self.len, false);
+        let _ = unsafe { raw_file_lock(&self.file, None, self.offset, self.len, false) };
     }
 }
