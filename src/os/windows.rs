@@ -1,3 +1,4 @@
+//! Provides low-level support operations for file locking on Windows platforms.
 use std::fs::File;
 use std::io::{self, Error, ErrorKind};
 use std::mem::MaybeUninit;
@@ -11,6 +12,12 @@ use winapi::um::minwinbase::{LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
 
 use crate::{FileGuard, Lock};
 
+/// Acquires and releases a file lock.
+///
+/// # Safety
+///
+/// When used to unlock, this does not guarantee that an exclusive lock is
+/// already held.
 pub unsafe fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
@@ -52,6 +59,11 @@ pub unsafe fn raw_file_lock(
     }
 }
 
+/// Downgrades a file lock from exclusive to shared.
+///
+/// # Safety
+///
+/// This does not guarantee that an exclusive lock is already held.
 pub unsafe fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     // Add a shared lock.
     raw_file_lock(f, Some(Lock::Shared), off, len, false)?;
@@ -59,6 +71,9 @@ pub unsafe fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result
     raw_file_lock(f, None, off, len, false)
 }
 
+/// Windows-specific extensions to [`FileGuard`].
+///
+/// [`FileGuard`]: ../../struct.FileGuard.html
 pub trait FileGuardExt {}
 
 impl<T> FileGuardExt for FileGuard<T> where T: Deref<Target = File> {}

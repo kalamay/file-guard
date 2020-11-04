@@ -1,3 +1,4 @@
+//! Provides low-level support operations for file locking.
 cfg_if::cfg_if! {
     if #[cfg(windows)] {
         pub mod windows;

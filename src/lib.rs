@@ -100,7 +100,7 @@
 //! [`.downgrade()`]: struct.FileGuard.html#method.downgrade
 //! [`.upgrade()`]: os/unix/trait.FileGuardExt.html#tymethod.upgrade
 
-//#![deny(missing_docs)]
+#![deny(missing_docs)]
 
 use std::fs::File;
 use std::io::ErrorKind;
@@ -110,12 +110,48 @@ use std::{fmt, io};
 pub mod os;
 use self::os::{raw_file_downgrade, raw_file_lock};
 
+/// The type of a lock operation.
+///
+/// This is used to specify the desired lock type when used with [`lock()`]
+/// and [`try_lock()`], and it is the successful result type returned by
+/// [`lock_any()`].
+///
+/// [`lock()`]: fn.lock.html
+/// [`try_lock()`]: fn.try_lock.html
+/// [`lock_any()`]: fn.lock_any.html
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Lock {
+    /// A shared lock may be concurrently held by multiple processes while
+    /// preventing future exclusive locks its lifetime.
+    ///
+    /// The shared lock type cannot be obtained while an exclusive lock is held
+    /// by another process. When successful, a shared lock guarantees that only
+    /// one or more shared locks are concurrently held, and that no exclusive
+    /// locks are held.
+    ///
+    /// This lock type--often referred to as a read lock--may be used as a
+    /// means of signaling read integrity. When used cooperatively, they ensure
+    /// no exclusive lock is held, and thus, no other process may be writing to
+    /// a shared resource.
     Shared,
+    /// An exclusive lock may only be held by a single process.
+    ///
+    /// The exclusive lock type can neither be obtained while any shared locks
+    /// are held or while any other exclusive locks are held. This linearizes
+    /// the sequence of processes attempting to acquire an exclusive lock.
+    ///
+    /// This lock type--also known as a write lock--may be used as a means of
+    /// ensuring write exclusivity. In a cooperative locking environment, all
+    /// access to a shared resource is halted until the exlusive lock is
+    /// released.
     Exclusive,
 }
 
+/// Wait and claim the desired [`Lock`] type using a byte range of a file.
+///
+/// The byte range does not need to exist in the underlying file.
+///
+/// [`Lock`]: enum.Lock.html
 pub fn lock<T: Deref<Target = File>>(
     file: T,
     lock: Lock,
@@ -133,6 +169,15 @@ pub fn lock<T: Deref<Target = File>>(
     })
 }
 
+/// Attempt to claim the desired [`Lock`] type using a byte range of a file.
+///
+/// If the desired [`Lock`] type cannot be obtained without blocking, an
+/// `Error` of kind `ErrorKind::WouldBlock` is returned. Otherwise if
+/// successful, the lock is held.
+///
+/// The byte range does not need to exist in the underlying file.
+///
+/// [`Lock`]: enum.Lock.html
 pub fn try_lock<T: Deref<Target = File>>(
     file: T,
     lock: Lock,
@@ -150,6 +195,20 @@ pub fn try_lock<T: Deref<Target = File>>(
     })
 }
 
+/// First attempt to claim an [`Exclusive`] lock and then fallback to a
+/// [`Shared`] lock for a byte range of a file.
+///
+/// When successful, the [`FileGuard`] may be inspected for the lock type
+/// obtained using [`.lock_type()`], [`.is_shared()`], or [`.is_exclusive()`].
+///
+/// The byte range does not need to exist in the underlying file.
+///
+/// [`Exclusive`]: enum.Lock.html#variant.Exclusive
+/// [`Shared`]: enum.Lock.html#variant.Shared
+/// [`FileGuard`]: struct.FileGuard.html
+/// [`.lock_type()`]: struct.FileGuard.html#method.lock_type
+/// [`.is_shared()`]: struct.FileGuard.html#method.is_shared
+/// [`.is_exclusive()`]: struct.FileGuard.html#method.is_exclusive
 pub fn lock_any<T: Deref<Target = File>>(
     file: T,
     offset: usize,
@@ -176,6 +235,15 @@ pub fn lock_any<T: Deref<Target = File>>(
     })
 }
 
+/// An RAII implementation of a "scoped lock" of a file. When this structure
+/// is dropped (falls out of scope), the lock will be unlocked.
+///
+/// This structure is created by the [`lock()`], [`try_lock()`], and
+/// [`lock_any()`] functions.
+///
+/// [`lock()`]: fn.lock.html
+/// [`try_lock()`]: fn.try_lock.html
+/// [`lock_any()`]: fn.lock_any.html
 #[must_use = "if unused the file lock will immediately unlock"]
 pub struct FileGuard<T: Deref<Target = File>> {
     offset: usize,
@@ -201,41 +269,67 @@ impl<T> FileGuard<T>
 where
     T: Deref<Target = File>,
 {
+    /// Gets the [`Lock`] type currently held.
+    ///
+    /// [`Lock`]: enum.Lock.html
     #[inline]
     pub fn lock_type(&self) -> Lock {
         self.lock
     }
 
+    /// Test if the currently held [`Lock`] type is [`Shared`].
+    ///
+    /// [`Lock`]: enum.Lock.html
+    /// [`Shared`]: enum.Lock.html#variant.Shared
     #[inline]
     pub fn is_shared(&self) -> bool {
         self.lock == Lock::Shared
     }
 
+    /// Test if the currently held [`Lock`] type is [`Exclusive`].
+    ///
+    /// [`Lock`]: enum.Lock.html
+    /// [`Exclusive`]: enum.Lock.html#variant.Exclusive
     #[inline]
     pub fn is_exclusive(&self) -> bool {
         self.lock == Lock::Exclusive
     }
 
+    /// Gets the byte range of the held lock.
     #[inline]
     pub fn range(&self) -> Range<usize> {
         self.offset..(self.offset + self.len)
     }
 
+    /// Gets the byte offset of the held lock.
     #[inline]
     pub fn offset(&self) -> usize {
         self.offset
     }
 
+    /// Gets the byte length of the held lock.
     #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// Tests if the byte range of the lock has a length of zero.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
+    /// Safely exchanges an [`Exclusive`] [`Lock`] for a [`Shared`] one.
+    ///
+    /// If the currently held lock is already [`Shared`], no change is made and
+    /// the method succeeds. This exchange safely ensures no lock is released
+    /// during operation. That is, no waiting [`Exclusive`] lock attempts may
+    /// obtain the lock during the downgrade. Other [`Shared`] locks waiting
+    /// will be granted a lock as a result, however.
+    ///
+    /// [`Lock`]: enum.Lock.html
+    /// [`Exclusive`]: enum.Lock.html#variant.Exclusive
+    /// [`Shared`]: enum.Lock.html#variant.Shared
     pub fn downgrade(&mut self) -> io::Result<()> {
         if self.is_exclusive() {
             unsafe {

@@ -1,3 +1,4 @@
+//! Provides low-level support operations for file locking on UNIX platforms.
 use libc::{fcntl, off_t, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, SEEK_SET};
 
 use std::fs::File;
@@ -8,6 +9,12 @@ use std::os::unix::io::AsRawFd;
 
 use crate::{FileGuard, Lock};
 
+/// Acquires and releases a file lock.
+///
+/// # Safety
+///
+/// When used to unlock, this does not guarantee that an exclusive lock is
+/// already held.
 pub unsafe fn raw_file_lock(
     f: &File,
     lock: Option<Lock>,
@@ -49,12 +56,36 @@ pub unsafe fn raw_file_lock(
     }
 }
 
+/// Downgrades a file lock from exclusive to shared.
+///
+/// # Safety
+///
+/// This does not guarantee that an exclusive lock is already held.
 pub unsafe fn raw_file_downgrade(f: &File, off: usize, len: usize) -> io::Result<()> {
     raw_file_lock(f, Some(Lock::Shared), off, len, false)
 }
 
+/// UNIX-specific extensions to [`FileGuard`].
+///
+/// [`FileGuard`]: ../../struct.FileGuard.html
 pub trait FileGuardExt {
+    /// Upgrades a lock from [`Shared`] to [`Exclusive`].
+    ///
+    /// If the currently held lock is already [`Exclusive`], no change is made
+    /// and the method succeeds.
+    ///
+    /// [`Shared`]: ../../enum.Lock.html#variant.Shared
+    /// [`Exclusive`]: ../../enum.Lock.html#variant.Exclusive
     fn upgrade(&mut self) -> io::Result<()>;
+
+    /// Attempts to upgrade a lock from [`Shared`] to [`Exclusive`].
+    ///
+    /// If the currently held lock is already [`Exclusive`], no change is made
+    /// and the method succeeds. If the upgrade cannot be obtained without
+    /// blocking, an `Error` of kind `ErrorKind::WouldBlock` is returned.
+    ///
+    /// [`Shared`]: ../../enum.Lock.html#variant.Shared
+    /// [`Exclusive`]: ../../enum.Lock.html#variant.Exclusive
     fn try_upgrade(&mut self) -> io::Result<()>;
 }
 
