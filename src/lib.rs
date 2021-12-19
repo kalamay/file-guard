@@ -1,4 +1,4 @@
-//! A cross-platform library for safe advisory file locking.
+//! A cross-platform library for advisory file locking.
 //!
 //! The lock supports both exclusive and shared locking modes for a byte range
 //! of an opened `File` object. Exclusively locking a portion of a file denies
@@ -55,7 +55,7 @@
 //!
 //! let t = Thing {
 //!     a: file_guard::lock(&file, Lock::Exclusive, 0, 1)?,
-//!     b: file_guard::lock(&file, Lock::Shared, 1, 1)?,
+//!     b: file_guard::lock(&file, Lock::Shared, 1, 2)?,
 //! };
 //! // both locks will be unlocked when t goes out of scope
 //! # Ok(())
@@ -86,7 +86,7 @@
 //!
 //! let t = Thing {
 //!     a: file_guard::lock(file.clone(), Lock::Exclusive, 0, 1)?,
-//!     b: file_guard::lock(file, Lock::Shared, 1, 1)?,
+//!     b: file_guard::lock(file, Lock::Shared, 1, 2)?,
 //! };
 //! // both locks will be unlocked and the file will be closed when t goes out of scope
 //! # Ok(())
@@ -196,7 +196,8 @@ pub fn try_lock<T: Deref<Target = File>>(
 }
 
 /// First attempt to claim an [`Exclusive`] lock and then fallback to a
-/// [`Shared`] lock for a byte range of a file.
+/// [`Shared`] lock for a byte range of a file. This is not currently an
+/// atomic operation.
 ///
 /// When successful, the [`FileGuard`] may be inspected for the lock type
 /// obtained using [`.lock_type()`], [`.is_shared()`], or [`.is_exclusive()`].
