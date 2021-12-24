@@ -17,10 +17,16 @@ arbitrary advisory locking protocol between processes.
 The result of a [`lock()`], [`try_lock()`], or [`lock_any()`] is a
 [`FileGuard`]. When dropped, this [`FileGuard`] will unlock the region of
 the file currently held. Exclusive locks may be [`.downgrade()`]'ed to
-either a shared lock cross platform. On UNIX systems, a shared lock may
-be [`.upgrade()`]'ed to an exclusive lock.
+either a shared lock cross platform.
 
 On Unix systems `fcntl` is used to perform the locking, and on Windows, `LockFileEx`.
+All generally available behavior is consistent across platforms. For platform-
+specific behavior, traits may be used for the respective platform. For example,
+on Windows, locks cannot be safely upgraded, whereas on Unix systems, this can
+be done safely and atomically. To use this feature, the
+[`file_guard::os::unix::FileGuardExt`] may `use`ed, enabling the [`.upgrade()`]
+and [`.try_upgrade()`] methods.
+
 
 # Examples
 
@@ -95,4 +101,6 @@ let t = Thing {
 [`try_lock()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.try_lock.html
 [`lock_any()`]: https://docs.rs/file-guard/0.1.0/file_guard/fn.lock_any.html
 [`.downgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/struct.FileGuard.html#method.downgrade
+[`file_guard::os::unix::FileGuardExt`]: https://docs.rs/file-guard/0.1.0/file_guard/os/unix/trait.FileGuardExt.html
 [`.upgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/os/unix/trait.FileGuardExt.html#tymethod.upgrade
+[`.try_upgrade()`]: https://docs.rs/file-guard/0.1.0/file_guard/os/unix/trait.FileGuardExt.html#tymethod.try_upgrade
