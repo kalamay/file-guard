@@ -41,6 +41,10 @@ pub unsafe fn raw_file_lock(
             None => F_UNLCK as c_short,
         },
         l_whence: SEEK_SET as c_short,
+        #[cfg(any(target_os = "freebsd", target_os = "solaris", target_os = "illumos"))]
+        l_sysid: 0,
+        #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+        l_pad: [0; 4],
     };
 
     loop {
