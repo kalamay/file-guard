@@ -2,7 +2,7 @@
 
 # file-guard
 
-A cross-platform library for safe file locking in Rust.
+A cross-platform library for advisory file locking in Rust.
 
 Take a look at the [Documentation](https://docs.rs/file-guard/) for details!
 
@@ -63,7 +63,7 @@ struct Thing<'file> {
 
 let t = Thing {
     a: file_guard::lock(&file, Lock::Exclusive, 0, 1)?,
-    b: file_guard::lock(&file, Lock::Shared, 1, 1)?,
+    b: file_guard::lock(&file, Lock::Shared, 1, 2)?,
 };
 // both locks will be unlocked when t goes out of scope
 ```
@@ -91,7 +91,7 @@ struct Thing {
 
 let t = Thing {
     a: file_guard::lock(file.clone(), Lock::Exclusive, 0, 1)?,
-    b: file_guard::lock(file, Lock::Shared, 1, 1)?,
+    b: file_guard::lock(file, Lock::Shared, 1, 2)?,
 };
 // both locks will be unlocked and the file will be closed when t goes out of scope
 ```
