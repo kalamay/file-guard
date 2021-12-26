@@ -2,7 +2,7 @@
 
 # file-guard
 
-A cross-platform library for advisory file locking in Rust.
+A cross-platform library for simple advisory file locking in Rust.
 
 Take a look at the [Documentation](https://docs.rs/file-guard/) for details!
 

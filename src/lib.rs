@@ -1,4 +1,4 @@
-//! A cross-platform library for advisory file locking.
+//! A cross-platform library for simple advisory file locking.
 //!
 //! The lock supports both exclusive and shared locking modes for a byte range
 //! of an opened `File` object. Exclusively locking a portion of a file denies
