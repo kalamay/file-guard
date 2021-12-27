@@ -75,13 +75,14 @@ jobs:
       - name: Run cross test
         run: cross test --target aarch64-linux-android
 
-  test_misc:
-    name: Test miscellaneous systems
+  build_misc:
+    name: Build miscellaneous systems
     strategy:
       matrix:
         target:
           - x86_64-sun-solaris
           - x86_64-unknown-netbsd
+          - x86_64-unknown-freebsd
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -98,5 +99,5 @@ jobs:
           mkdir -p "$HOME/.bin"
           curl -sfSL --retry-delay 10 --retry 5 "${CROSS_URL}" | tar zxf - -C "$HOME/.bin"
           echo "$HOME/.bin" >> $GITHUB_PATH
-      - name: Run cross test
-        run: cross test --target ${{ matrix.target }}
+      - name: Run cross build
+        run: cross build --target ${{ matrix.target }}
