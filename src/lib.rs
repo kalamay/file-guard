@@ -21,6 +21,8 @@
 //! [`file_guard::os::unix::FileGuardExt`] may `use`ed, enabling the [`.upgrade()`]
 //! and [`.try_upgrade()`] methods.
 //!
+//! Note that on Windows, the file must be open with write permissions to lock it.
+//!
 //! # Examples
 //!
 //! ```
