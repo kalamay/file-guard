@@ -9,9 +9,6 @@ description = "A cross-platform library for simple advisory file locking."
 keywords = ["file-guard", "file", "lock", "fcntl", "LockFile"]
 edition = "2021"
 
-[dependencies]
-cfg-if = "1.0.0"
-
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.109"
 
@@ -19,4 +16,4 @@ libc = "0.2.109"
 winapi = { version = "0.3.9", features = ["winerror", "minwinbase", "minwindef", "fileapi"] }
 
 [dev-dependencies]
-vmap = "0.5"
+vmap = "0.6"
