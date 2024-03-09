@@ -34,13 +34,14 @@ and [`.try_upgrade()`] methods.
 use file_guard::Lock;
 use std::fs::OpenOptions;
 
-let file = OpenOptions::new()
+let mut file = OpenOptions::new()
     .read(true)
     .write(true)
     .create(true)
     .open("example-lock")?;
 
-let lock = file_guard::lock(&file, Lock::Exclusive, 0, 1)?;
+let mut lock = file_guard::lock(&mut file, Lock::Exclusive, 0, 1)?;
+write_to_file(&mut lock)?;
 // the lock will be unlocked when it goes out of scope
 ```
 
@@ -68,7 +69,7 @@ let t = Thing {
 // both locks will be unlocked when t goes out of scope
 ```
 
-Anything that can `Deref` to a `File` can be used with the [`FileGuard`].
+Anything that can `Deref` or `DerefMut` to a `File` can be used with the [`FileGuard`].
 This works with `Rc<File>`:
 
 ```rust
