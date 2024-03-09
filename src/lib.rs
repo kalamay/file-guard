@@ -21,6 +21,8 @@
 //! [`file_guard::os::unix::FileGuardExt`] may `use`ed, enabling the [`.upgrade()`]
 //! and [`.try_upgrade()`] methods.
 //!
+//! Note that on Windows, the file must be open with write permissions to lock it.
+//!
 //! # Examples
 //!
 //! ```
@@ -28,13 +30,15 @@
 //! use std::fs::OpenOptions;
 //!
 //! # fn main() -> std::io::Result<()> {
-//! let file = OpenOptions::new()
+//! let mut file = OpenOptions::new()
 //!     .read(true)
 //!     .write(true)
 //!     .create(true)
 //!     .open("example-lock")?;
 //!
-//! let lock = file_guard::lock(&file, Lock::Exclusive, 0, 1)?;
+//! let mut lock = file_guard::lock(&mut file, Lock::Exclusive, 0, 1)?;
+//! write_to_file(&mut lock)?;
+//! # fn write_to_file(f: &mut std::fs::File) -> std::io::Result<()> { Ok(()) }
 //! // the lock will be unlocked when it goes out of scope
 //! # Ok(())
 //! # }
@@ -67,7 +71,7 @@
 //! # }
 //! ```
 //!
-//! Anything that can `Deref` to a `File` can be used with the [`FileGuard`]
+//! Anything that can `Deref` or `DerefMut` to a `File` can be used with the [`FileGuard`]
 //! (i.e. `Rc<File>`):
 //!
 //! ```
@@ -111,7 +115,7 @@
 
 use std::fs::File;
 use std::io::ErrorKind;
-use std::ops::{Deref, Range};
+use std::ops::{Deref, DerefMut, Range};
 use std::{fmt, io};
 
 pub mod os;
@@ -357,6 +361,15 @@ where
 
     fn deref(&self) -> &T {
         &self.file
+    }
+}
+
+impl<T> DerefMut for FileGuard<T>
+where
+    T: DerefMut<Target = File>,
+{
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.file
     }
 }
 
