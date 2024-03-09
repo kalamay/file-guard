@@ -1,7 +1,7 @@
 on:
   pull_request:
   push:
-    branches: [main, staging, trying]
+    branches: [main]
     tags:
       - "v*.*.*"
 
