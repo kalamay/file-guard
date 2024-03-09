@@ -9,6 +9,7 @@ use winapi::shared::minwindef::DWORD;
 use winapi::shared::winerror::ERROR_LOCK_VIOLATION;
 use winapi::um::fileapi::{LockFileEx, UnlockFileEx};
 use winapi::um::minwinbase::{LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY, OVERLAPPED};
+use winapi::um::winnt::HANDLE;
 
 use crate::{FileGuard, Lock};
 
@@ -30,7 +31,7 @@ pub unsafe fn raw_file_lock(
     }
 
     let mut ov: OVERLAPPED = MaybeUninit::zeroed().assume_init();
-    let mut s = ov.u.s_mut();
+    let s = ov.u.s_mut();
     s.Offset = (off & 0xffffffff) as DWORD;
     s.OffsetHigh = (off >> 16 >> 16) as DWORD;
 
@@ -42,9 +43,9 @@ pub unsafe fn raw_file_lock(
         if lock == Lock::Exclusive {
             flags |= LOCKFILE_EXCLUSIVE_LOCK;
         }
-        LockFileEx(f.as_raw_handle(), flags, 0, lenlow, lenhigh, &mut ov)
+        LockFileEx(f.as_raw_handle() as HANDLE, flags, 0, lenlow, lenhigh, &mut ov)
     } else {
-        UnlockFileEx(f.as_raw_handle(), 0, lenlow, lenhigh, &mut ov)
+        UnlockFileEx(f.as_raw_handle() as HANDLE, 0, lenlow, lenhigh, &mut ov)
     };
 
     if rc == 0 {
